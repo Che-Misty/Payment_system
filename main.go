@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"sync"
 )
 
@@ -10,48 +11,102 @@ var uID int
 type User struct {
 	ID      int
 	Name    string
-	Balance float32
+	Balance float64
 	mu      sync.Mutex
 }
 
-func (u *User) NewUser(name string) *User {
-	u.mu.Lock()
+func NewUser(name string, balance float64) *User {
 	uID += 1
-	u.mu.Unlock()
-	var balance float32
 
 	return &User{ID: uID, Name: name, Balance: balance}
 }
 
-func (u *User) Deposit(amount float32) {
+type Transaction struct {
+	FromID int
+	ToID   int
+	Amount float64
+}
+
+type PaymentSystem struct {
+	Users        map[int]*User
+	Transactions []Transaction
+	mu           sync.Mutex
+}
+
+func NewPaymentSystem() *PaymentSystem {
+	return &PaymentSystem{Users: make(map[int]*User), Transactions: make([]Transaction, 0)}
+}
+
+func (ps *PaymentSystem) AddUser(name string, balance float64) {
+	user := NewUser(name, balance)
+	id := user.ID
+	ps.Users[id] = user
+}
+
+func (ps *PaymentSystem) AddTransaction(id1 int, id2 int, amount float64) {
+	trx := Transaction{FromID: id1, ToID: id2, Amount: amount}
+	ps.Transactions = append(ps.Transactions, trx)
+}
+
+func (u *User) Deposit(amount float64) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	u.Balance += amount
-	fmt.Printf("Баланс пользователя %s равен: %.2f рублей.\n", u.Name, u.Balance)
 }
 
-func (u *User) Withdraw(amount float32) {
+func (u *User) Withdraw(amount float64) (bool, error) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 
 	if amount > u.Balance {
-		fmt.Printf("На счету пользователя %s недостаточно средств для списания %.2f рублей.\n", u.Name, u.Balance)
-		return
+		return false, fmt.Errorf("User %s haven't enought money", u.Name)
 	}
 	u.Balance -= amount
-	fmt.Printf("Баланс пользователя %s равен: %.2f рублей.\n", u.Name, u.Balance)
+	return true, nil
+}
+
+func (ps *PaymentSystem) ProcessingTransaction(i int) error {
+	trx := ps.Transactions[i]
+	sender := ps.Users[trx.FromID]
+	recipient := ps.Users[trx.ToID]
+
+	if len(sender.Name) == 0 {
+		return fmt.Errorf("User %s not found!", sender.Name)
+	}
+
+	if len(recipient.Name) == 0 {
+		return fmt.Errorf("User %s not found!", recipient.Name)
+	}
+
+	if ok, err := sender.Withdraw(trx.Amount); !ok {
+		return err
+	}
+	recipient.Deposit(trx.Amount)
+	return nil
 }
 
 func main() {
-	var u User
-	accounts := make(map[string]*User)
-	username := []string{"Kate", "Dung", "Son", "Ngoc"}
-	for _, val := range username {
-		v := val
-		accounts[v] = u.NewUser(v)
+	// 	accounts := make(map[string]*User)
+	// 	username := []string{"Kate", "Dung", "Son", "Ngoc"}
+
+	ps := NewPaymentSystem()
+
+	ps.AddUser("Khena", 400)
+	ps.AddUser("Shiro", 200)
+
+	ps.AddTransaction(1, 2, 100)
+	ps.AddTransaction(1, 2, 91.23)
+	ps.AddTransaction(2, 1, 44.41)
+	ps.AddTransaction(2, 1, 250.12)
+	ps.AddTransaction(1, 2, 121.17)
+	
+	
+
+	for idx := range ps.Transactions {
+		ps.ProcessingTransaction(idx)
 	}
 
-	for _, usr := range accounts {
-		fmt.Printf("id=%d name=%s balance=%.2f\n", usr.ID, usr.Name, usr.Balance)
+	for _, user := range ps.Users {
+		fmt.Printf("Баланс пользователя %s на текущий момент: %.2f$\n", user.Name, user.Balance)
 	}
 }
