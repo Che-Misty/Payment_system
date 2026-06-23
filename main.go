@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 	"sync"
 )
 
@@ -28,13 +27,13 @@ type Transaction struct {
 }
 
 type PaymentSystem struct {
-	Users        map[int]*User
-	Transactions []Transaction
-	mu           sync.Mutex
+	Users            map[int]*User
+	TransactionQueue []Transaction
+	mu               sync.Mutex
 }
 
 func NewPaymentSystem() *PaymentSystem {
-	return &PaymentSystem{Users: make(map[int]*User), Transactions: make([]Transaction, 0)}
+	return &PaymentSystem{Users: make(map[int]*User), TransactionQueue: make([]Transaction, 0)}
 }
 
 func (ps *PaymentSystem) AddUser(name string, balance float64) {
@@ -45,7 +44,7 @@ func (ps *PaymentSystem) AddUser(name string, balance float64) {
 
 func (ps *PaymentSystem) AddTransaction(id1 int, id2 int, amount float64) {
 	trx := Transaction{FromID: id1, ToID: id2, Amount: amount}
-	ps.Transactions = append(ps.Transactions, trx)
+	ps.TransactionQueue = append(ps.TransactionQueue, trx)
 }
 
 func (u *User) Deposit(amount float64) {
@@ -65,8 +64,7 @@ func (u *User) Withdraw(amount float64) (bool, error) {
 	return true, nil
 }
 
-func (ps *PaymentSystem) ProcessingTransaction(i int) error {
-	trx := ps.Transactions[i]
+func (ps *PaymentSystem) ProcessingTransaction(trx Transaction) error {
 	sender := ps.Users[trx.FromID]
 	recipient := ps.Users[trx.ToID]
 
@@ -85,9 +83,16 @@ func (ps *PaymentSystem) ProcessingTransaction(i int) error {
 	return nil
 }
 
+func (ps *PaymentSystem) Worker(ch <-chan Transaction) {
+	for trx := range ch {
+		if err := ps.ProcessingTransaction(trx); err != nil {
+			fmt.Println(err)
+		}
+	}
+}
+
 func main() {
-	// 	accounts := make(map[string]*User)
-	// 	username := []string{"Kate", "Dung", "Son", "Ngoc"}
+	var wg sync.WaitGroup
 
 	ps := NewPaymentSystem()
 
@@ -99,12 +104,24 @@ func main() {
 	ps.AddTransaction(2, 1, 44.41)
 	ps.AddTransaction(2, 1, 250.12)
 	ps.AddTransaction(1, 2, 121.17)
-	
-	
+	ps.AddTransaction(1, 2, 500)
+	ps.AddTransaction(1, 2, 11.11)
+	ps.AddTransaction(1, 2, 10.01)
+	ps.AddTransaction(2, 1, 250.12)
+	ps.AddTransaction(2, 1, 54.12)
 
-	for idx := range ps.Transactions {
-		ps.ProcessingTransaction(idx)
+	ch := make(chan Transaction, len(ps.TransactionQueue))
+
+	for _, t := range ps.TransactionQueue {
+		ch <- t
 	}
+
+	for i := 0; i < 3; i++ {
+		wg.Go(func() { ps.Worker(ch) })
+	}
+
+	close(ch)
+	wg.Wait()
 
 	for _, user := range ps.Users {
 		fmt.Printf("Баланс пользователя %s на текущий момент: %.2f$\n", user.Name, user.Balance)
