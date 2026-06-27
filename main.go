@@ -5,44 +5,40 @@ import (
 	"sync"
 )
 
-var uID int
-
 type User struct {
-	ID      int
+	ID      string
 	Name    string
 	Balance float64
 	mu      sync.Mutex
 }
 
-func NewUser(name string, balance float64) *User {
-	uID += 1
+func NewUser(id string, name string, balance float64) *User {
 
-	return &User{ID: uID, Name: name, Balance: balance}
+	return &User{ID: id, Name: name, Balance: balance}
 }
 
 type Transaction struct {
-	FromID int
-	ToID   int
+	FromID string
+	ToID   string
 	Amount float64
 }
 
 type PaymentSystem struct {
-	Users            map[int]*User
+	Users            map[string]*User
 	TransactionQueue []Transaction
 	mu               sync.Mutex
 }
 
 func NewPaymentSystem() *PaymentSystem {
-	return &PaymentSystem{Users: make(map[int]*User), TransactionQueue: make([]Transaction, 0)}
+	return &PaymentSystem{Users: make(map[string]*User), TransactionQueue: make([]Transaction, 0)}
 }
 
-func (ps *PaymentSystem) AddUser(name string, balance float64) {
-	user := NewUser(name, balance)
-	id := user.ID
+func (ps *PaymentSystem) AddUser(id string, name string, balance float64) {
+	user := NewUser(id, name, balance)
 	ps.Users[id] = user
 }
 
-func (ps *PaymentSystem) AddTransaction(id1 int, id2 int, amount float64) {
+func (ps *PaymentSystem) AddTransaction(id1 string, id2 string, amount float64) {
 	trx := Transaction{FromID: id1, ToID: id2, Amount: amount}
 	ps.TransactionQueue = append(ps.TransactionQueue, trx)
 }
@@ -96,19 +92,19 @@ func main() {
 
 	ps := NewPaymentSystem()
 
-	ps.AddUser("Khena", 400)
-	ps.AddUser("Shiro", 200)
+	ps.AddUser("1", "Khena", 400)
+	ps.AddUser("2", "Shiro", 200)
 
-	ps.AddTransaction(1, 2, 100)
-	ps.AddTransaction(1, 2, 91.23)
-	ps.AddTransaction(2, 1, 44.41)
-	ps.AddTransaction(2, 1, 250.12)
-	ps.AddTransaction(1, 2, 121.17)
-	ps.AddTransaction(1, 2, 500)
-	ps.AddTransaction(1, 2, 11.11)
-	ps.AddTransaction(1, 2, 10.01)
-	ps.AddTransaction(2, 1, 250.12)
-	ps.AddTransaction(2, 1, 54.12)
+	ps.AddTransaction("1", "2", 100)
+	ps.AddTransaction("1", "2", 91.23)
+	ps.AddTransaction("2", "1", 44.41)
+	ps.AddTransaction("2", "1", 250.12)
+	ps.AddTransaction("1", "2", 121.17)
+	ps.AddTransaction("1", "2", 500)
+	ps.AddTransaction("1", "2", 11.11)
+	ps.AddTransaction("1", "2", 10.01)
+	ps.AddTransaction("2", "1", 250.12)
+	ps.AddTransaction("2", "1", 54.12)
 
 	ch := make(chan Transaction, len(ps.TransactionQueue))
 
