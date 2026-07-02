@@ -25,7 +25,6 @@ type Transaction struct {
 type PaymentSystem struct {
 	Users        map[string]*User
 	Transactions []Transaction
-	mu           sync.Mutex
 }
 
 func NewPaymentSystem() *PaymentSystem {
@@ -48,15 +47,15 @@ func (u *User) Deposit(amount float64) {
 	u.Balance += amount
 }
 
-func (u *User) Withdraw(amount float64) (bool, error) {
+func (u *User) Withdraw(amount float64) error {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 
 	if amount > u.Balance {
-		return false, fmt.Errorf("User %s haven't enought money", u.Name)
+		return fmt.Errorf("User %s haven't enought money", u.Name)
 	}
 	u.Balance -= amount
-	return true, nil
+	return nil
 }
 
 func (ps *PaymentSystem) ProcessingTransaction(i int) error {
@@ -72,7 +71,7 @@ func (ps *PaymentSystem) ProcessingTransaction(i int) error {
 		return fmt.Errorf("User %s not found!", recipient.Name)
 	}
 
-	if ok, err := sender.Withdraw(trx.Amount); !ok {
+	if err := sender.Withdraw(trx.Amount); err != nil {
 		return err
 	}
 	recipient.Deposit(trx.Amount)
